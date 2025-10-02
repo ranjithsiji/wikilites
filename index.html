@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WikiLite</title>
+    <style>
+        /* --- Global Variables & Reset --- */
+        :root {
+            --primary-color: #337ab7;
+            --primary-color-dark: #286090;
+            --background-light: #f5f5f5;
+            --background-white: #fff;
+            --text-color: #333;
+            --border-color: #ddd;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background-light);
+            margin: 0;
+            padding: 1em;
+            color: var(--text-color);
+        }
+
+        /* --- Main Container & Header --- */
+        #container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: var(--background-white);
+            padding: 1.5em;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        #main-heading {
+            color: var(--primary-color);
+            font-size: 2em;
+            margin-bottom: 0.5em;
+            text-align: center;
+            font-weight: 700;
+        }
+        #search-container {
+            display: flex;
+            gap: 0.5em;
+            margin-bottom: 1em;
+        }
+        #search-input {
+            flex-grow: 1;
+            padding: 0.8em;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        #lang-select {
+            padding: 0.8em;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        #search-button {
+            padding: 0.8em 1.2em;
+            border: none;
+            background-color: var(--primary-color);
+            color: var(--background-white);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.2s;
+        }
+        #search-button:hover {
+            background-color: var(--primary-color-dark);
+        }
+        #settings {
+            display: flex;
+            align-items: center;
+            gap: 1.5em;
+            margin-bottom: 1em;
+            font-size: 0.9em;
+            color: #555;
+        }
+        .setting-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+        }
+        #settings input {
+            cursor: pointer;
+        }
+        #results {
+            border-top: 1px solid var(--border-color);
+            padding-top: 1em;
+        }
+        .result-item-link {
+            text-decoration: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .result-item-link:hover {
+            text-decoration: underline;
+        }
+
+        /* --- Modal Styles --- */
+        #modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: rgba(0, 0, 0, 0.6);
+        }
+        #modal-content {
+            background-color: #fefefe;
+            margin: 2% auto;
+            width: 90%;
+            max-width: 900px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+            position: relative; /* For the scroll-to-top button */
+        }
+        #modal-header {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #modal-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: var(--text-color);
+            margin: 0;
+            padding-right: 10px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        #close-button {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+            transition: color 0.2s;
+        }
+        #close-button:hover {
+            color: #666;
+        }
+        #modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+        #modal-body.no-images img { display: none !important; }
+
+        /* --- Scroll to Top Button Style --- */
+        #scroll-to-top-button {
+            display: none; /* Hidden by default */
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            color: var(--background-white);
+            border: none;
+            cursor: pointer;
+            font-size: 1.5em;
+            line-height: 40px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1001;
+            transition: background-color 0.2s;
+        }
+        #scroll-to-top-button:hover {
+            background-color: var(--primary-color-dark);
+        }
+
+        /* --- Summary Mode Styles (Accordion) --- */
+        .section-container {
+            margin-bottom: 1em;
+        }
+        .section-title {
+            cursor: pointer;
+            color: var(--primary-color);
+            background-color: var(--background-white);
+            border: 1px solid var(--border-color);
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin: 0;
+            font-weight: 600;
+            font-size: 1.1em;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .section-title::after {
+            content: '+'; /* Plus icon when collapsed */
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-left: 10px;
+            transition: transform 0.2s;
+        }
+        .section-title:hover {
+            background-color: #e6f0ff;
+            border-color: var(--primary-color);
+        }
+        .section-title.loaded {
+            color: var(--text-color);
+            background-color: #fafafa;
+            cursor: default;
+            border-bottom: 1px solid #ddd;
+            border-radius: 6px 6px 0 0;
+            margin: 0;
+        }
+        .section-title.loaded::after {
+            content: '−'; /* Minus icon when loaded/expanded */
+            transform: rotate(0deg);
+        }
+
+        .section-content {
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-top: none;
+            background-color: var(--background-white);
+            border-radius: 0 0 6px 6px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        /* --- Article Content Cleanup (from Wikipedia API) --- */
+        #modal-body a { color: var(--primary-color); }
+        #modal-body h1, #modal-body h2, #modal-body h3, #modal-body h4 {
+            line-height: 1.3;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+            margin-top: 1.5em;
+        }
+        #modal-body .infobox {
+            border: 1px solid var(--border-color);
+            background-color: #f9f9f9;
+            padding: 1em;
+            margin: 0 0 1em 1em;
+            float: right;
+            clear: right;
+            width: 250px;
+            font-size: 0.9em;
+        }
+        #modal-body table.wikitable {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+            border: 1px solid #a2a9b1;
+        }
+        #modal-body table.wikitable th, #modal-body table.wikitable td {
+            border: 1px solid #a2a9b1;
+            padding: 0.4em 0.6em;
+        }
+        #modal-body table.wikitable th { background-color: #eaecf0; }
+        #modal-body img { max-width: 100%; height: auto; }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <h1 id="main-heading">WikiLite</h1>
+        <div id="search-container">
+            <input type="text" id="search-input" placeholder="Search Wikipedia...">
+            <select id="lang-select"></select>
+            <button id="search-button">Search</button>
+        </div>
+        <div id="settings">
+            <div class="setting-item">
+                <input type="checkbox" id="toggle-summary" checked>
+                <label for="toggle-summary">Summary Mode</label>
+            </div>
+            <div class="setting-item">
+                <input type="checkbox" id="toggle-images" checked>
+                <label for="toggle-images">Show Images</label>
+            </div>
+        </div>
+        <div id="results"></div>
+    </div>
+
+    <div id="modal">
+        <div id="modal-content">
+            <div id="modal-header">
+                <h1 id="modal-title"></h1>
+                <span id="close-button">&times;</span>
+            </div>
+            <div id="modal-body"></div>
+            <button id="scroll-to-top-button" title="Scroll to Top">&#8593;</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Element References ---
+        const searchInput = document.getElementById('search-input');
+        const langSelect = document.getElementById('lang-select');
+        const searchButton = document.getElementById('search-button');
+        const resultsContainer = document.getElementById('results');
+        const modal = document.getElementById('modal');
+        const modalBody = document.getElementById('modal-body');
+        const closeButton = document.getElementById('close-button');
+        const toggleImages = document.getElementById('toggle-images');
+        const toggleSummary = document.getElementById('toggle-summary');
+        const scrollToTopButton = document.getElementById('scroll-to-top-button');
+        const modalTitle = document.getElementById('modal-title');
+
+        // --- Data Setup ---
+        const languages = {
+            "en": "English", "es": "Español", "de": "Deutsch", "fr": "Français",
+            "it": "Italiano", "ja": "日本語", "pt": "Português", "ru": "Русский",
+            "zh": "中文", "hi": "हिन्दी"
+        };
+
+        // Populate language dropdown
+        langSelect.innerHTML = Object.entries(languages)
+            .map(([code, name]) => `<option value="${code}">${name}</option>`)
+            .join('');
+
+        // --- Core Functions ---
+
+        /** Fetches and displays search results from Wikipedia's API. */
+        const searchWikipedia = async () => {
+            const searchTerm = searchInput.value;
+            if (!searchTerm) {
+                resultsContainer.innerHTML = '<p>Please enter a search term.</p>';
+                return;
+            }
+            resultsContainer.innerHTML = '<p>Searching...</p>';
+
+            const lang = langSelect.value;
+            const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${searchTerm}&format=json&origin=*`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                displayResults(data.query.search);
+            } catch (error) {
+                resultsContainer.innerHTML = '<p>An error occurred while fetching results.</p>';
+            }
+        };
+
+        /** Renders the list of search results. */
+        const displayResults = (results) => {
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<p>No results found.</p>';
+                return;
+            }
+            resultsContainer.innerHTML = results.map(result => `
+                <div class="result-item">
+                    <h3><a class="result-item-link" data-pageid="${result.pageid}" data-title="${result.title}">${result.title}</a></h3>
+                    <p>${result.snippet}</p>
+                </div>`).join('');
+        };
+
+        /** Initializes the modal and determines whether to fetch full or summary article. */
+        const fetchArticle = (query) => {
+            modal.style.display = 'block';
+            modalBody.innerHTML = '<p>Loading article...</p>';
+
+            modalTitle.textContent = query.title || 'Loading...';
+
+            // Store query info for subsequent section loading
+            modalBody.dataset.query = JSON.stringify(query);
+
+            // Toggle image visibility based on setting
+            if (toggleImages.checked) modalBody.classList.remove('no-images');
+            else modalBody.classList.add('no-images');
+
+            // Fetch content based on Summary Mode setting
+            if (toggleSummary.checked) fetchSummaryArticle(query);
+            else fetchFullArticle(query);
+        };
+
+        /** Fetches and displays the full article HTML. */
+        const fetchFullArticle = async (query) => {
+            const lang = langSelect.value;
+            const base = `https://${lang}.wikipedia.org/w/api.php?action=parse&format=json&origin=*`;
+            const url = query.pageid ? `${base}&pageid=${query.pageid}` : `${base}&page=${encodeURIComponent(query.title)}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.info);
+
+                modalTitle.textContent = data.parse.title;
+                modalBody.innerHTML = data.parse.text['*'];
+                modalBody.scrollTop = 0;
+            } catch (error) {
+                modalBody.innerHTML = `<p>Could not load the article. Error: ${error.message}</p>`;
+            }
+        };
+
+        /** Fetches the article lead section and list of sections for Summary Mode. */
+        const fetchSummaryArticle = async (query) => {
+            const lang = langSelect.value;
+            const base = `https://${lang}.wikipedia.org/w/api.php?action=parse&format=json&origin=*`;
+            const identifier = query.pageid ? `pageid=${query.pageid}` : `page=${encodeURIComponent(query.title)}`;
+
+            try {
+                // Fetch lead section (section 0) and section index list in parallel
+                const [leadRes, sectionsRes] = await Promise.all([
+                    fetch(`${base}&${identifier}&prop=text&section=0`),
+                    fetch(`${base}&${identifier}&prop=sections`)
+                ]);
+                const leadData = await leadRes.json();
+                const sectionsData = await sectionsRes.json();
+
+                if (leadData.error || sectionsData.error) throw new Error(leadData.error?.info || sectionsData.error?.info);
+
+                modalTitle.textContent = leadData.parse.title;
+
+                let html = leadData.parse.text['*']; // Start with lead section
+
+                // Construct accordion structure
+                html += sectionsData.parse.sections.map(s => `
+                    <div class="section-container">
+                    <h2 class="section-title" data-section-index="${s.index}">${s.line}</h2>
+                    <div class="section-content" id="section-content-${s.index}"></div>
+                    </div>
+                `).join('');
+
+                modalBody.innerHTML = html;
+                modalBody.scrollTop = 0;
+            } catch (error) {
+                modalBody.innerHTML = `<p>Could not load summary. Error: ${error.message}</p>`;
+            }
+        };
+
+        /** Fetches content for a specific section when its title is clicked. */
+        const fetchSectionContent = async (titleElement) => {
+            const sectionIndex = titleElement.dataset.sectionIndex;
+            const contentDiv = document.getElementById(`section-content-${sectionIndex}`);
+
+            // If already loaded, toggle visibility instead of re-fetching
+            if (titleElement.classList.contains('loaded')) {
+                contentDiv.style.display = contentDiv.style.display === 'none' ? 'block' : 'none';
+                titleElement.classList.toggle('collapsed', contentDiv.style.display === 'none');
+                return;
+            }
+
+            titleElement.classList.add('loaded');
+            contentDiv.innerHTML = '<p style="padding: 10px;">Loading section...</p>';
+
+            const query = JSON.parse(modalBody.dataset.query);
+            const lang = langSelect.value;
+            const base = `https://${lang}.wikipedia.org/w/api.php?action=parse&format=json&origin=*`;
+            const identifier = query.pageid ? `pageid=${query.pageid}` : `page=${encodeURIComponent(query.title)}`;
+            const url = `${base}&${identifier}&prop=text&section=${sectionIndex}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.info);
+                contentDiv.innerHTML = data.parse.text['*'];
+            } catch (error) {
+                contentDiv.innerHTML = `<p>Could not load section. Error: ${error.message}</p>`;
+            }
+        };
+
+        // --- Scroll to Top Logic ---
+
+        /** Toggles the visibility of the scroll-to-top button. */
+        const toggleScrollToTopButton = () => {
+            // Show button only if modal is visible and scrolled down past 300px
+            if (modal.style.display === 'block' && modalBody.scrollTop > 300) {
+                scrollToTopButton.style.display = 'block';
+            } else {
+                scrollToTopButton.style.display = 'none';
+            }
+        };
+
+        // --- Event Listeners ---
+
+        searchButton.addEventListener('click', searchWikipedia);
+        searchInput.addEventListener('keypress', (e) => e.key === 'Enter' && searchWikipedia());
+
+        // Listener for search results (delegation)
+        resultsContainer.addEventListener('click', (e) => {
+            const link = e.target.closest('.result-item-link');
+            if (link) {
+                fetchArticle({ pageid: link.dataset.pageid, title: link.dataset.title });
+            }
+        });
+
+        // Listener for article content (section clicks and internal Wikipedia links)
+        modalBody.addEventListener('click', (e) => {
+            const link = e.target.closest('a');
+            const sectionTitle = e.target.closest('.section-title');
+
+            if (sectionTitle) {
+                fetchSectionContent(sectionTitle);
+            } else if (link && link.getAttribute('href')?.startsWith('/wiki/')) {
+                // Only follow links that point to articles (skip File:, Special:, etc.)
+                if (!link.getAttribute('href').includes(':')) {
+                    e.preventDefault();
+                    const newTitle = decodeURIComponent(link.getAttribute('href').substring(6));
+                    fetchArticle({ title: newTitle });
+                }
+            }
+        });
+
+        // Close modal button
+        closeButton.addEventListener('click', () => {
+            modal.style.display = 'none';
+            scrollToTopButton.style.display = 'none';
+        });
+
+        // Close modal when clicking outside the content area
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+                scrollToTopButton.style.display = 'none';
+            }
+        });
+
+        // Scroll to top button action and visibility
+        scrollToTopButton.addEventListener('click', () => {
+            modalBody.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+        modalBody.addEventListener('scroll', toggleScrollToTopButton);
+    </script>
+
+</body>
+</html>
