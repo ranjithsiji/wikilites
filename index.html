@@ -100,6 +100,24 @@
             text-decoration: underline;
         }
 
+        /* --- Footer Styles (New) --- */
+        #main-footer {
+            max-width: 800px;
+            margin: 1em auto;
+            text-align: center;
+            font-size: 0.85em;
+            color: #666;
+            padding: 10px 0;
+        }
+        #main-footer a {
+            color: var(--primary-color);
+            text-decoration: none;
+            margin: 0 5px;
+        }
+        #main-footer a:hover {
+            text-decoration: underline;
+        }
+
         /* --- Modal Styles --- */
         #modal {
             display: none;
@@ -308,6 +326,12 @@
         <div id="results"></div>
     </div>
 
+    <footer id="main-footer">
+        Powered by <a href="https://www.mediawiki.org/wiki/API:Main_page" target="_blank">MediaWiki API</a> from <a href="https://wikipedia.org" target="_blank">Wikipedia</a>.
+        <a href="https://github.com/ranjithsiji/wikilites" target="_blank">Source Code</a>
+        | Created by <a href="https://w.wiki/tN" target="_blank">ranjithsiji</a> | License: <a href="https://www.gnu.org/licenses/gpl-3.0.en.html" target="_blank">GPL v3</a>
+    </footer>
+
     <div id="modal">
         <div id="modal-content">
             <div id="modal-header">
@@ -335,7 +359,7 @@
         const toggleSummary = document.getElementById('toggle-summary');
         const scrollToTopButton = document.getElementById('scroll-to-top-button');
         const modalTitle = document.getElementById('modal-title');
-        const originalLinkButton = document.getElementById('original-link-button'); // New reference
+        const originalLinkButton = document.getElementById('original-link-button');
 
         // --- Language Loading Function ---
 
@@ -386,6 +410,7 @@
         /** Updates the "View Original Article" link in the modal header. */
         const updateOriginalLink = (title, lang) => {
             if (title) {
+                // Wikipedia article titles use underscores instead of spaces
                 const url = `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`;
                 originalLinkButton.href = url;
                 originalLinkButton.style.display = 'block';
@@ -394,24 +419,53 @@
             }
         };
 
+        /** Fetches and displays search results from Wikipedia's API. */
+        const searchWikipedia = async () => {
+            const searchTerm = searchInput.value;
+            if (!searchTerm || langSelect.value === 'loading') {
+                resultsContainer.innerHTML = '<p>Please enter a search term and ensure languages have loaded.</p>';
+                return;
+            }
+            resultsContainer.innerHTML = '<p>Searching...</p>';
+
+            const lang = langSelect.value;
+            const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${searchTerm}&format=json&origin=*`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                displayResults(data.query.search);
+            } catch (error) {
+                resultsContainer.innerHTML = `<p>An error occurred while fetching results from ${lang}.wikipedia.org.</p>`;
+            }
+        };
+
+        /** Renders the list of search results. */
+        const displayResults = (results) => {
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<p>No results found.</p>';
+                return;
+            }
+            resultsContainer.innerHTML = results.map(result => `
+                <div class="result-item">
+                    <h3><a class="result-item-link" data-pageid="${result.pageid}" data-title="${result.title}">${result.title}</a></h3>
+                    <p>${result.snippet}</p>
+                </div>`).join('');
+        };
+
         /** Initializes the modal and determines whether to fetch full or summary article. */
         const fetchArticle = (query) => {
             modal.style.display = 'block';
             modalBody.innerHTML = '<p>Loading article...</p>';
 
             modalTitle.textContent = query.title || 'Loading...';
-
-            // IMPORTANT: Update the link immediately with the known title/language
             updateOriginalLink(query.title, langSelect.value);
 
-            // Store query info for subsequent section loading
             modalBody.dataset.query = JSON.stringify(query);
 
-            // Toggle image visibility based on setting
             if (toggleImages.checked) modalBody.classList.remove('no-images');
             else modalBody.classList.add('no-images');
 
-            // Fetch content based on Summary Mode setting
             if (toggleSummary.checked) fetchSummaryArticle(query);
             else fetchFullArticle(query);
         };
@@ -429,7 +483,6 @@
 
                 const finalTitle = data.parse.title;
                 modalTitle.textContent = finalTitle;
-                // Re-update link in case the API normalized the title
                 updateOriginalLink(finalTitle, lang);
 
                 modalBody.innerHTML = data.parse.text['*'];
@@ -457,7 +510,6 @@
 
                 const finalTitle = leadData.parse.title;
                 modalTitle.textContent = finalTitle;
-                // Re-update link in case the API normalized the title
                 updateOriginalLink(finalTitle, lang);
 
                 let html = leadData.parse.text['*'];
@@ -506,42 +558,6 @@
             }
         };
 
-        // ... (Remaining functions for searchWikipedia, displayResults, etc. remain the same)
-
-        /** Fetches and displays search results from Wikipedia's API. */
-        const searchWikipedia = async () => {
-            const searchTerm = searchInput.value;
-            if (!searchTerm || langSelect.value === 'loading') {
-                resultsContainer.innerHTML = '<p>Please enter a search term and ensure languages have loaded.</p>';
-                return;
-            }
-            resultsContainer.innerHTML = '<p>Searching...</p>';
-
-            const lang = langSelect.value;
-            const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${searchTerm}&format=json&origin=*`;
-
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                displayResults(data.query.search);
-            } catch (error) {
-                resultsContainer.innerHTML = `<p>An error occurred while fetching results from ${lang}.wikipedia.org.</p>`;
-            }
-        };
-
-        /** Renders the list of search results. */
-        const displayResults = (results) => {
-            if (results.length === 0) {
-                resultsContainer.innerHTML = '<p>No results found.</p>';
-                return;
-            }
-            resultsContainer.innerHTML = results.map(result => `
-                <div class="result-item">
-                    <h3><a class="result-item-link" data-pageid="${result.pageid}" data-title="${result.title}">${result.title}</a></h3>
-                    <p>${result.snippet}</p>
-                </div>`).join('');
-        };
-
         /** Toggles the visibility of the scroll-to-top button. */
         const toggleScrollToTopButton = () => {
             if (modal.style.display === 'block' && modalBody.scrollTop > 300) {
@@ -556,7 +572,6 @@
         searchButton.addEventListener('click', searchWikipedia);
         searchInput.addEventListener('keypress', (e) => e.key === 'Enter' && searchWikipedia());
 
-        // Listener for search results (delegation)
         resultsContainer.addEventListener('click', (e) => {
             const link = e.target.closest('.result-item-link');
             if (link) {
@@ -564,7 +579,6 @@
             }
         });
 
-        // Listener for article content (section clicks and internal Wikipedia links)
         modalBody.addEventListener('click', (e) => {
             const link = e.target.closest('a');
             const sectionTitle = e.target.closest('.section-title');
@@ -580,23 +594,20 @@
             }
         });
 
-        // Close modal button
         closeButton.addEventListener('click', () => {
             modal.style.display = 'none';
             scrollToTopButton.style.display = 'none';
-            originalLinkButton.style.display = 'none'; // Hide the link when closing
+            originalLinkButton.style.display = 'none';
         });
 
-        // Close modal when clicking outside the content area
         window.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.style.display = 'none';
                 scrollToTopButton.style.display = 'none';
-                originalLinkButton.style.display = 'none'; // Hide the link when closing
+                originalLinkButton.style.display = 'none';
             }
         });
 
-        // Scroll to top button action and visibility
         scrollToTopButton.addEventListener('click', () => {
             modalBody.scrollTo({
                 top: 0,
