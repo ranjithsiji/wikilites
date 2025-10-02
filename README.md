@@ -1,5 +1,3 @@
----
-
 # WikiLite: A Minimalist Wikipedia Reader
 
 WikiLite is a single-file, client-side web application designed to provide a fast, focused, and low-bandwidth way to read Wikipedia articles. It supports features like language selection, a toggleable image display, and a unique **Summary Mode** that loads articles section-by-section using an accordion interface.
@@ -53,7 +51,6 @@ This project uses standard web technologies and relies entirely on the **Wikiped
 * **JavaScript Efficiency:** Uses modern `async/await` for API calls and employs **event delegation** for efficient event handling on dynamically added elements (search results, sections, and internal links).
 * **The Accordion Logic:** The `fetchSectionContent` function handles the core logic for the accordion, preventing redundant API calls for already loaded sections.
 
----
 
 ## 🤝 Contributing
 
