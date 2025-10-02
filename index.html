@@ -55,6 +55,7 @@
             border: 1px solid var(--border-color);
             border-radius: 4px;
             font-size: 1em;
+            min-width: 120px;
         }
         #search-button {
             padding: 0.8em 1.2em;
@@ -121,7 +122,7 @@
             display: flex;
             flex-direction: column;
             height: 90vh;
-            position: relative; /* For the scroll-to-top button */
+            position: relative;
         }
         #modal-header {
             padding: 10px 20px;
@@ -130,15 +131,31 @@
             justify-content: space-between;
             align-items: center;
         }
+        #modal-title-group {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-grow: 1;
+        }
         #modal-title {
             font-size: 1.5em;
             font-weight: 700;
             color: var(--text-color);
             margin: 0;
-            padding-right: 10px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+        #original-link-button {
+            font-size: 0.85em;
+            color: var(--primary-color);
+            text-decoration: none;
+            cursor: pointer;
+            margin-top: 4px;
+            white-space: nowrap;
+        }
+        #original-link-button:hover {
+            text-decoration: underline;
         }
         #close-button {
             color: #aaa;
@@ -147,6 +164,7 @@
             cursor: pointer;
             line-height: 1;
             transition: color 0.2s;
+            margin-left: 15px;
         }
         #close-button:hover {
             color: #666;
@@ -160,7 +178,7 @@
 
         /* --- Scroll to Top Button Style --- */
         #scroll-to-top-button {
-            display: none; /* Hidden by default */
+            display: none;
             position: absolute;
             bottom: 20px;
             right: 20px;
@@ -202,7 +220,7 @@
             align-items: center;
         }
         .section-title::after {
-            content: '+'; /* Plus icon when collapsed */
+            content: '+';
             font-weight: bold;
             font-size: 1.2em;
             margin-left: 10px;
@@ -221,7 +239,7 @@
             margin: 0;
         }
         .section-title.loaded::after {
-            content: '−'; /* Minus icon when loaded/expanded */
+            content: '−';
             transform: rotate(0deg);
         }
 
@@ -272,7 +290,9 @@
         <h1 id="main-heading">WikiLite</h1>
         <div id="search-container">
             <input type="text" id="search-input" placeholder="Search Wikipedia...">
-            <select id="lang-select"></select>
+            <select id="lang-select">
+                <option value="loading" disabled selected>Loading Languages...</option>
+            </select>
             <button id="search-button">Search</button>
         </div>
         <div id="settings">
@@ -291,7 +311,10 @@
     <div id="modal">
         <div id="modal-content">
             <div id="modal-header">
-                <h1 id="modal-title"></h1>
+                <div id="modal-title-group">
+                    <h1 id="modal-title"></h1>
+                    <a id="original-link-button" href="#" target="_blank">View Original Article</a>
+                </div>
                 <span id="close-button">&times;</span>
             </div>
             <div id="modal-body"></div>
@@ -312,53 +335,63 @@
         const toggleSummary = document.getElementById('toggle-summary');
         const scrollToTopButton = document.getElementById('scroll-to-top-button');
         const modalTitle = document.getElementById('modal-title');
+        const originalLinkButton = document.getElementById('original-link-button'); // New reference
 
-        // --- Data Setup ---
-        const languages = {
-            "en": "English", "es": "Español", "de": "Deutsch", "fr": "Français",
-            "it": "Italiano", "ja": "日本語", "pt": "Português", "ru": "Русский",
-            "zh": "中文", "hi": "हिन्दी"
-        };
+        // --- Language Loading Function ---
 
-        // Populate language dropdown
-        langSelect.innerHTML = Object.entries(languages)
-            .map(([code, name]) => `<option value="${code}">${name}</option>`)
-            .join('');
-
-        // --- Core Functions ---
-
-        /** Fetches and displays search results from Wikipedia's API. */
-        const searchWikipedia = async () => {
-            const searchTerm = searchInput.value;
-            if (!searchTerm) {
-                resultsContainer.innerHTML = '<p>Please enter a search term.</p>';
-                return;
-            }
-            resultsContainer.innerHTML = '<p>Searching...</p>';
-
-            const lang = langSelect.value;
-            const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${searchTerm}&format=json&origin=*`;
+        /** Fetches all Wikipedia language codes and names from the MediaWiki API. */
+        const fetchLanguages = async () => {
+            const url = `https://en.wikipedia.org/w/api.php?action=query&meta=siteinfo&siprop=interwikimap&sifilteriw=local&format=json&origin=*`;
 
             try {
                 const response = await fetch(url);
                 const data = await response.json();
-                displayResults(data.query.search);
+
+                const interwikis = data.query.interwikimap;
+
+                // Sort by language name, prioritize English
+                interwikis.sort((a, b) => {
+                    if (a.prefix === 'en') return -1;
+                    if (b.prefix === 'en') return 1;
+                    return (a.language || a.prefix).localeCompare(b.language || b.prefix);
+                });
+
+                const optionsHTML = interwikis
+                    .filter(i => i.prefix && i.url && i.url.includes('wikipedia.org'))
+                    .map(i => {
+                        const name = i.language || i.prefix;
+                        const isSelected = i.prefix === 'en' ? 'selected' : '';
+                        return `<option value="${i.prefix}" ${isSelected}>${name} (${i.prefix})</option>`;
+                    })
+                    .join('');
+
+                langSelect.innerHTML = optionsHTML;
+
             } catch (error) {
-                resultsContainer.innerHTML = '<p>An error occurred while fetching results.</p>';
+                console.error("Error fetching languages:", error);
+                // Fallback to a hardcoded list on failure
+                const fallbackLanguages = { "en": "English", "es": "Español", "de": "Deutsch", "fr": "Français", "it": "Italiano", "ru": "Русский" };
+                langSelect.innerHTML = Object.entries(fallbackLanguages)
+                    .map(([code, name]) => `<option value="${code}" ${code === 'en' ? 'selected' : ''}>${name}</option>`)
+                    .join('');
             }
         };
 
-        /** Renders the list of search results. */
-        const displayResults = (results) => {
-            if (results.length === 0) {
-                resultsContainer.innerHTML = '<p>No results found.</p>';
-                return;
+        // Call the language fetch function immediately on page load
+        document.addEventListener('DOMContentLoaded', fetchLanguages);
+
+
+        // --- Core Functions ---
+
+        /** Updates the "View Original Article" link in the modal header. */
+        const updateOriginalLink = (title, lang) => {
+            if (title) {
+                const url = `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`;
+                originalLinkButton.href = url;
+                originalLinkButton.style.display = 'block';
+            } else {
+                originalLinkButton.style.display = 'none';
             }
-            resultsContainer.innerHTML = results.map(result => `
-                <div class="result-item">
-                    <h3><a class="result-item-link" data-pageid="${result.pageid}" data-title="${result.title}">${result.title}</a></h3>
-                    <p>${result.snippet}</p>
-                </div>`).join('');
         };
 
         /** Initializes the modal and determines whether to fetch full or summary article. */
@@ -367,6 +400,9 @@
             modalBody.innerHTML = '<p>Loading article...</p>';
 
             modalTitle.textContent = query.title || 'Loading...';
+
+            // IMPORTANT: Update the link immediately with the known title/language
+            updateOriginalLink(query.title, langSelect.value);
 
             // Store query info for subsequent section loading
             modalBody.dataset.query = JSON.stringify(query);
@@ -391,7 +427,11 @@
                 const data = await response.json();
                 if (data.error) throw new Error(data.error.info);
 
-                modalTitle.textContent = data.parse.title;
+                const finalTitle = data.parse.title;
+                modalTitle.textContent = finalTitle;
+                // Re-update link in case the API normalized the title
+                updateOriginalLink(finalTitle, lang);
+
                 modalBody.innerHTML = data.parse.text['*'];
                 modalBody.scrollTop = 0;
             } catch (error) {
@@ -406,7 +446,6 @@
             const identifier = query.pageid ? `pageid=${query.pageid}` : `page=${encodeURIComponent(query.title)}`;
 
             try {
-                // Fetch lead section (section 0) and section index list in parallel
                 const [leadRes, sectionsRes] = await Promise.all([
                     fetch(`${base}&${identifier}&prop=text&section=0`),
                     fetch(`${base}&${identifier}&prop=sections`)
@@ -416,11 +455,13 @@
 
                 if (leadData.error || sectionsData.error) throw new Error(leadData.error?.info || sectionsData.error?.info);
 
-                modalTitle.textContent = leadData.parse.title;
+                const finalTitle = leadData.parse.title;
+                modalTitle.textContent = finalTitle;
+                // Re-update link in case the API normalized the title
+                updateOriginalLink(finalTitle, lang);
 
-                let html = leadData.parse.text['*']; // Start with lead section
+                let html = leadData.parse.text['*'];
 
-                // Construct accordion structure
                 html += sectionsData.parse.sections.map(s => `
                     <div class="section-container">
                     <h2 class="section-title" data-section-index="${s.index}">${s.line}</h2>
@@ -440,7 +481,6 @@
             const sectionIndex = titleElement.dataset.sectionIndex;
             const contentDiv = document.getElementById(`section-content-${sectionIndex}`);
 
-            // If already loaded, toggle visibility instead of re-fetching
             if (titleElement.classList.contains('loaded')) {
                 contentDiv.style.display = contentDiv.style.display === 'none' ? 'block' : 'none';
                 titleElement.classList.toggle('collapsed', contentDiv.style.display === 'none');
@@ -466,11 +506,44 @@
             }
         };
 
-        // --- Scroll to Top Logic ---
+        // ... (Remaining functions for searchWikipedia, displayResults, etc. remain the same)
+
+        /** Fetches and displays search results from Wikipedia's API. */
+        const searchWikipedia = async () => {
+            const searchTerm = searchInput.value;
+            if (!searchTerm || langSelect.value === 'loading') {
+                resultsContainer.innerHTML = '<p>Please enter a search term and ensure languages have loaded.</p>';
+                return;
+            }
+            resultsContainer.innerHTML = '<p>Searching...</p>';
+
+            const lang = langSelect.value;
+            const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${searchTerm}&format=json&origin=*`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                displayResults(data.query.search);
+            } catch (error) {
+                resultsContainer.innerHTML = `<p>An error occurred while fetching results from ${lang}.wikipedia.org.</p>`;
+            }
+        };
+
+        /** Renders the list of search results. */
+        const displayResults = (results) => {
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<p>No results found.</p>';
+                return;
+            }
+            resultsContainer.innerHTML = results.map(result => `
+                <div class="result-item">
+                    <h3><a class="result-item-link" data-pageid="${result.pageid}" data-title="${result.title}">${result.title}</a></h3>
+                    <p>${result.snippet}</p>
+                </div>`).join('');
+        };
 
         /** Toggles the visibility of the scroll-to-top button. */
         const toggleScrollToTopButton = () => {
-            // Show button only if modal is visible and scrolled down past 300px
             if (modal.style.display === 'block' && modalBody.scrollTop > 300) {
                 scrollToTopButton.style.display = 'block';
             } else {
@@ -499,7 +572,6 @@
             if (sectionTitle) {
                 fetchSectionContent(sectionTitle);
             } else if (link && link.getAttribute('href')?.startsWith('/wiki/')) {
-                // Only follow links that point to articles (skip File:, Special:, etc.)
                 if (!link.getAttribute('href').includes(':')) {
                     e.preventDefault();
                     const newTitle = decodeURIComponent(link.getAttribute('href').substring(6));
@@ -512,6 +584,7 @@
         closeButton.addEventListener('click', () => {
             modal.style.display = 'none';
             scrollToTopButton.style.display = 'none';
+            originalLinkButton.style.display = 'none'; // Hide the link when closing
         });
 
         // Close modal when clicking outside the content area
@@ -519,6 +592,7 @@
             if (e.target === modal) {
                 modal.style.display = 'none';
                 scrollToTopButton.style.display = 'none';
+                originalLinkButton.style.display = 'none'; // Hide the link when closing
             }
         });
 
